@@ -1,6 +1,5 @@
 #include <vector>
 #include <iostream>
-#include <queue>
 #include <climits>
 #include <map>
 
@@ -16,9 +15,6 @@ struct node
 {
     int v;
     long long dist;
-    bool operator<(const node& other) const {
-        return dist > other.dist;
-    }
 };
 long long deltaStepping(vector<vector<edge>> &graph, long long delta){
     int n = graph.size();
@@ -32,22 +28,47 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
             }
         }
     }
+    vector<int> added(n, 0);
     vector<long long> distance(n, INF); 
-    vector<char> recorded(n, 0);
     map<long long, vector<node>> buckets;
+    auto relaxation = [&](edge e, node ne){
+        long long newDist = ne.dist + e.val;
+        if(newDist < distance[e.v]){
+            distance[e.v] = newDist;
+            buckets[newDist / delta].push_back({e.v, newDist});
+        }
+    };
     distance[0] = 0;
     buckets[0].push_back({0, 0});
     while(!buckets.empty()){
         long long curIndex = buckets.begin()->first;
-        while(true){
+        vector<node> heavyNodes; 
+        while(true){ 
             auto it = buckets.find(curIndex);
             if(it == buckets.end()){
                 break;
             }
-            vector<node> curBucket = move(buckets[curIndex]);   
-            buckets.erase(curIndex); 
-            for(node act : curBucket){
-
+            vector<node> curBucket = std::move(it->second);   
+            buckets.erase(it); 
+            for(node curNode : curBucket){
+                if (distance[curNode.v] != curNode.dist){
+                    continue;
+                }
+                if(added[curNode.v] == 0 && heavy[curNode.v].size() > 0){
+                    heavyNodes.push_back(curNode);
+                    added[curNode.v] = 1;
+                }
+                for(edge l : light[curNode.v]){
+                    relaxation(l, curNode);
+                }
+            }
+        }
+        if (distance[n - 1] != INF && distance[n - 1] / delta == curIndex){
+            return distance[n - 1];
+        }
+        for(node v : heavyNodes){
+            for(edge h : heavy[v.v]){
+                relaxation(h, {v.v, distance[v.v]});
             }
         }
     }
@@ -76,7 +97,7 @@ int main(){
         }
         long long delta = 1;
         long long answer = deltaStepping(graph, delta);
-        if(answer == LLONG_MAX){
+        if(answer == INF){
             cout << -1 << "\n";
         }else{
             cout << answer << "\n";
