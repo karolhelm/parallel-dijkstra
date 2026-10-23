@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+exec > results.txt 2>&1
 
 g++ src/dijkstraOneThread.cpp -O3 -std=c++17 -o dijkstraOneThread
 g++ src/dijkstraDeltaStepping.cpp -O3 -std=c++17 -fopenmp -o dijkstraDeltaStepping

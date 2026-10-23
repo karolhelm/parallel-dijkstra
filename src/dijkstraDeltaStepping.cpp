@@ -3,7 +3,7 @@
 #include <climits>
 #include <map>
 #include <atomic>
-//#include <omp.h>
+#include <omp.h>
 
 using namespace std;
 
@@ -41,18 +41,18 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
 
     map<long long, vector<node>> buckets;
 
+    vector<vector<node>> to_push_later(omp_get_max_threads());
+
     auto relaxation = [&](edge e, node ne){
         long long newDist = ne.dist + e.val;
         
-        #pragma omp critical(relaxation)
-        { 
-            long long oldDist = distance[e.v].load();
-            if(newDist < oldDist){
-                distance[e.v].store(newDist);
-                buckets[newDist / delta].push_back({e.v, newDist});
+        long long oldDist = distance[e.v].load();
+        while(newDist < oldDist){
+            if(distance[e.v].compare_exchange_weak(oldDist, newDist)){
+                to_push_later[omp_get_thread_num()].push_back({e.v, newDist});
+                break;
             }
         }
-        
     };
 
     distance[0] = 0;
@@ -86,6 +86,14 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
                     relaxation(l, curNode);
                 }
             }
+
+            for(int t = 0; t<omp_get_max_threads(); ++t){
+                for(node v : to_push_later[t]){
+                    buckets[v.dist / delta].push_back(v);
+                }
+
+                to_push_later[t].clear();
+            }
         }
 
         long long finalDistance = distance[n - 1].load();
@@ -100,6 +108,14 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
             for(edge h : heavy[v.v]){
                 relaxation(h, {v.v, distanceV});
             }
+        }
+
+        for(int t = 0; t<omp_get_max_threads(); ++t){
+            for(node v : to_push_later[t]){
+                buckets[v.dist / delta].push_back(v);
+            }
+
+            to_push_later[t].clear();
         }
     }
 
