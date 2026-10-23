@@ -32,16 +32,17 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
         }
     }
 
-    vector<int> added(n, 0);
+    vector<atomic<int>> added(n);
     vector<atomic<long long>> distance(n); 
 
     for(int i = 0; i<n; ++i){
+        added[i] = 0;
         distance[i] = INF;
     }
 
     map<long long, vector<node>> buckets;
 
-    vector<vector<node>> to_push_later(omp_get_max_threads());
+    vector<vector<node>> push_relaxed_later(omp_get_max_threads());
 
     auto relaxation = [&](edge e, node ne){
         long long newDist = ne.dist + e.val;
@@ -49,7 +50,7 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
         long long oldDist = distance[e.v].load();
         while(newDist < oldDist){
             if(distance[e.v].compare_exchange_weak(oldDist, newDist)){
-                to_push_later[omp_get_thread_num()].push_back({e.v, newDist});
+                push_relaxed_later[omp_get_thread_num()].push_back({e.v, newDist});
                 break;
             }
         }
@@ -59,7 +60,7 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
     buckets[0].push_back({0, 0});
     while(!buckets.empty()){
         long long curIndex = buckets.begin()->first;
-        vector<node> heavyNodes; 
+        vector<int> heavyNodes; 
 
         while(true){ 
             auto it = buckets.find(curIndex);
@@ -68,18 +69,20 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
             }
 
             vector<node> curBucket = move(it->second);   
-            buckets.erase(it); 
+            buckets.erase(it);
+
+            vector <vector<int>> push_heavy_later(omp_get_max_threads());
 
             #pragma omp parallel for
             for(node curNode : curBucket){
                 if(distance[curNode.v].load() != curNode.dist){
                     continue;
                 }
-                
-                #pragma omp critical(heavy_pushback)
-                if(added[curNode.v] == 0 && heavy[curNode.v].size() > 0){
-                    heavyNodes.push_back(curNode);
-                    added[curNode.v] = 1;
+        
+                if(heavy[curNode.v].size() > 0){
+                    if(added[curNode.v].exchange(1)){
+                        push_heavy_later[omp_get_thread_num()].push_back(curNode.v);
+                    }
                 }
 
                 for(edge l : light[curNode.v]){
@@ -88,11 +91,18 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
             }
 
             for(int t = 0; t<omp_get_max_threads(); ++t){
-                for(node v : to_push_later[t]){
+                for(node v : push_relaxed_later[t]){
                     buckets[v.dist / delta].push_back(v);
                 }
 
-                to_push_later[t].clear();
+                push_relaxed_later[t].clear();
+
+
+                for(int v : push_heavy_later[t]){
+                    heavyNodes.push_back(v);
+                }
+
+                push_heavy_later[t].clear();
             }
         }
 
@@ -102,20 +112,20 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
         }
 
         #pragma omp parallel for
-        for(node v : heavyNodes){
-            long long distanceV = distance[v.v].load();
+        for(int v : heavyNodes){
+            long long distOfV = distance[v].load();
 
-            for(edge h : heavy[v.v]){
-                relaxation(h, {v.v, distanceV});
+            for(edge h : heavy[v]){
+                relaxation(h, {v, distOfV});
             }
         }
 
         for(int t = 0; t<omp_get_max_threads(); ++t){
-            for(node v : to_push_later[t]){
+            for(node v : push_relaxed_later[t]){
                 buckets[v.dist / delta].push_back(v);
             }
 
-            to_push_later[t].clear();
+            push_relaxed_later[t].clear();
         }
     }
 
