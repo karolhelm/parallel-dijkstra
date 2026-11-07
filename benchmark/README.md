@@ -33,20 +33,48 @@ One edge per vertex forms a directed cycle to guarantee reachability; the other
 destinations are random. Weights are 1–1000 and the seed is fixed at 20261107.
 Parallel edges and self-loops are allowed. This is a separate family from tests 01–12.
 
-The script compares Dijkstra with delta-stepping on 1/2/4/8 threads, using one warmup
+The script compares Dijkstra with delta-stepping on 1/2/4/8/16 threads, using one warmup
 and five measured runs per configuration in shuffled order. Compilation, generation
-and the initial reference answer are outside the timer. **Timings include the entire
-program, including input, output and cleanup.** Every answer for vertex n−1 is checked;
-the solvers still compute the complete graph. A failure or timeout stops the script.
+and the initial reference answer are outside the timer. It prints separate **compute**
+and **whole-process** timings. Compute includes working-structure initialization,
+solving and cleanup, including the light/heavy split for delta-stepping; it excludes
+reading/building the input graph and printing. Timers exist only in compiled copies
+under `results`; the C++ source files in `src` are untouched.
+
+Build copies expose all distances for validation against the reference. Delta-stepping's
+final copy from atomic distances is included in compute time. Whole-process time includes
+this full output and therefore differs from the normal scalar-output program. Errors or
+timeouts stop the script.
 
 Outputs go to a new `benchmark/results/<timestamp>/` directory: `raw.csv`,
 `summary.csv`, machine/compiler/source metadata, generated inputs and binaries.
-The summary contains medians, ranges and both speedups: versus Dijkstra and versus
-single-thread delta-stepping. Results and large generated inputs are ignored by Git.
+The final terminal table shows compute medians and speedup versus Dijkstra.
+CSV retains medians, ranges and both speedups: versus Dijkstra and versus
+single-thread delta-stepping, separately for compute and whole-process time.
+Existing `median_s`/`speedup_vs_*` CSV fields refer to whole-process time; the new
+`compute_*` fields refer to computations. Results and large generated inputs are ignored by Git.
+
+The 4-million-vertex random case is the family where earlier measurements showed
+roughly 3–4× compute speedup versus Dijkstra. This is an observed result, not a fixed
+value: other machines, loads, graphs or seeds can produce smaller gains or slowdowns.
 
 Quick check: `python3 benchmark/scaling.py --sizes 1000 10000 --threads 1 2 --repeat 2`.
 Use `--sizes`, `--threads`, `--degree`, `--repeat`, `--warmups`, `--timeout` and
 `--output` to change the experiment. Optional `--cpus` accepts an ordered list of CPU
-IDs, e.g. `--cpus 72,76,80,84,88,92,96,100`; it requires `taskset` and uses the first
-p CPUs for p threads. Choose distinct physical cores available on your machine;
-pinning does not reserve them. Keep the original tests as limiting cases too.
+IDs; it uses `taskset` and the first p CPUs for p threads. Without this option, the script
+automatically selects distinct cores on one socket if enough are available; otherwise
+it uses OpenMP's placement. Actual CPU lists are recorded in metadata. Pinning requires
+`taskset` and does not reserve the cores. Keep the original tests as limiting cases too.
+
+To focus on the largest random case: `python3 benchmark/scaling.py --sizes 4000000`.
+Use `--seed` to test another independently generated graph of the same family.
+
+Additional controlled cases: `--weights unit` assigns weight 1 while preserving the
+random graph's topology; `--degree 16` increases its outgoing degree; `--degree 1`
+leaves just the directed cycle. `--graph layered --layers 32 --weights unit` creates
+32 layers after the source, with edges only to the next layer. A backbone guarantees
+reachability and each nonterminal, nonsource vertex gets `degree-1` extra random
+edges. The source reaches the whole first layer and the final layer has no outgoing
+edges, so its actual edge count differs from `n*degree` and is recorded in CSV.
+
+Server results and interpretation: [REPORT.md](REPORT.md), [summary CSV](report_summary.csv).
