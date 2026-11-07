@@ -18,8 +18,6 @@ struct node
     }
 };
 
-// we want to go from 0 to n - 1 
-
 int main(){
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
@@ -50,9 +48,6 @@ int main(){
             if(act.dist > distance[act.v]){ 
                 continue;           //opt
             }
-            if (act.v == n - 1) {
-                break;              //opt
-            }   
             for(int i = 0; i < graph[act.v].size(); i++){
                 int u = act.v;
                 int v = graph[u][i].v;

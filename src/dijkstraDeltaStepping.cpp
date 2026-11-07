@@ -136,18 +136,6 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
                 }     
             }
 
-            #pragma omp single
-            {
-                long long finalDistance = distance[n - 1].load();
-                if(finalDistance != INF && finalDistance / delta == curIndex){
-                    finishWorking = true;
-                }
-            }
-
-            if(finishWorking){
-                break;
-            }
-            
             #pragma omp for
             for(int v : heavyNodes){
                 long long distOfV = distance[v].load();
@@ -203,7 +191,7 @@ int main(){
             w += val;
         }
 
-        long long delta = max((long long)1, 2*w/m);
+        long long delta = m > 0 ? max((long long)1, 2*w/m) : 1;
         long long answer = deltaStepping(graph, delta);
 
         if(answer == INF){
