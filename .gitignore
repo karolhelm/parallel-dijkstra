@@ -3,3 +3,4 @@ dijkstraDeltaStepping
 dijkstraOneThread
 temp.out
 results.txt
+/benchmark/results/
