@@ -85,15 +85,14 @@ W warstwowym daje `degree-1` dodatkowych krawędzi z każdego wierzchołka
 poza źródłem i ostatnią warstwą. `--degree 1` dla grafu losowego zostawia sam cykl.
 
 Liczbę warstw można zmienić przez `--layers`, a liczbę pomiarów jednego grafu
-przez `--repeat`. Domyślnie są to trzy pomiary dla `random` i pięć dla pozostałych typów.
+przez `--repeat`. Domyślnie są to trzy pomiary dla każdego typu grafu.
 
 ## Pomiary i poprawność
 
 1. Python kompiluje źródła C++ bez zmieniania ich treści.
 2. Generuje graf i uruchamia Dijkstrę po odpowiedź wzorcową, osobno dla każdego grafu.
 3. Dla każdego rozmiaru mierzy `--graph-count` grafów (domyślnie jeden).
-   Każdą konfigurację na każdym grafie mierzy domyślnie trzy razy dla `random`
-   i pięć razy dla warstwowego i ścieżki.
+   Każdą konfigurację na każdym grafie mierzy domyślnie trzy razy.
    Domyślne liczby wątków delta-stepping to 1, 2, 4, 8 i 16; Dijkstra używa jednego.
    W każdej rundzie kolejność konfiguracji jest mieszana.
 4. Porównuje wszystkie odległości z wzorcem i liczy mediany osobno dla każdego grafu.
