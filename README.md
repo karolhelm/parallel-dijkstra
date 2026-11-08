@@ -139,10 +139,10 @@ po jednym wierszu odległości dla każdego grafu, ze spacjami między wartości
 
 ## Raport i literatura
 
-Pomiary z 7 i 8 listopada 2026 opisuje [raport projektu](RAPORT_PROJEKTU.md).
-Raport opisuje wcześniejsze serie pomiarów.
-W seriach opisanych w raporcie timery i pełne wyjście dodawano do kopii przez Python.
-Obecnie są wprost w źródłach C++, z zachowaniem tych samych granic pomiaru.
+[Raport projektu](raport.pdf) opisuje implementację i pomiary na serwerze oraz laptopie.
+[Prezentacja](prezentacja.pdf) zawiera siedem slajdów o algorytmach, OpenMP i wynikach.
+W przedstawionych seriach wykonano po trzy pomiary dla grafów losowych oraz po pięć
+dla ścieżki i grafu warstwowego. Obecnie skrypt domyślnie wykonuje po trzy pomiary.
 
 U. Meyer, P. Sanders, *Δ-stepping: a parallelizable shortest path algorithm*,
 Journal of Algorithms 49(1), 114-152, 2003.
