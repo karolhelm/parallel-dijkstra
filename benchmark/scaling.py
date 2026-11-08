@@ -84,10 +84,8 @@ def main():
     parser.add_argument("--graph", choices=["random", "layered", "path"], default="random")
     parser.add_argument("--graph-count", type=int, default=1, help="Liczba grafów dla każdego rozmiaru (domyślnie 1)")
     parser.add_argument("--layers", type=int, default=32)
-    parser.add_argument("--repeat", type=int, help="Pomiary jednego grafu: domyślnie random 3, pozostałe 5")
+    parser.add_argument("--repeat", type=int, default=3, help="Pomiary jednego grafu (domyślnie 3)")
     args = parser.parse_args()
-    if args.repeat is None:
-        args.repeat = 3 if args.graph == "random" else 5
     if args.sizes is None:
         args.sizes = {
             "random": [4000000],
