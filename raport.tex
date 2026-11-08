@@ -1,0 +1,87 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{float}
+
+\title{Algorytm Dijkstry zrównoleglony metodą delta-stepping}
+\author{Karol Helm, Maciej Anioł}
+\date{Listopad 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Wprowadzenie}
+Celem projektu było zimplementowanie oraz przebadanie uwspółbieżnionej wersji algorytmu Dijkstry wykorzystującej metodę delta-stepping opisaną w artykule U. Meyer and P. Sanders, $\Delta$-stepping: a parallelizable shortest path algorithm, Journal of Algorithms 49 (2003). 
+\\
+Dany jest graf skierowany o nieujemnych wagach całkowitych. Obliczamy długości najkrótszych ścieżek z wierzchołka $0$ do wszystkich wierzchołków. Zwracamy odległość do wierzchołka $n-1$ lub $-1$, jeśli wierzchołek $n-1$ jest nieosiągalny. 
+\\
+Paczka projektu zawiera:
+\begin{itemize}
+    \item Rozwiązanie jednowątkowe $dijkstraOneThread.cpp$
+    \item Rozwiązanie wielowątkowe $dijkstraDeltaStepping.cpp$
+    \item Raport $raport.pdf$
+    \item Skrypt $run.sh$ uruchamiający $scaling.py$
+    \item Program w Pythonie generujący grafy oraz porównujący czasy działania rozwiązań $scaling.py$ 
+    \item Prezentację na zajęcia $prezentacja.pdf$
+\end{itemize}
+\section{Opis wersji jednowątkowej i wielowątkowej}
+\subsection{Wersja jednowątkowa}
+Wersja jednowątkowa jest implementacją klasycznego algorytmu Dijkstry korzystającego z kolejki priorytetowej. 
+\begin{enumerate}
+    \item Zdejmujemy z kolejki wierzchołek o najmniejszej odległości.
+    \item Sprawdzamy, czy ta odległość jest aktualna.
+    \item Relaksujemy krawędzie i jeśli poprawiamy odległość do innego wierzchołka to wrzucamy go na kolejkę.
+\end{enumerate}
+Konieczność utrzymania konkretnej kolejności przetwarzania wierzchołków utrudnia efektywne zrównoleglenie tej wersji algorytmu.
+\subsection{Wersja wielowątkowa}
+Wersja wielowątkowa korzysta z techniki delta-stepping. Zamiast wybierania pojedynczego wierzchołka o minimalnej odległości, algorytm przetwarza wierzchołki według kubełków odpowiadających przedziałom odległości
+$[i\Delta, (i+1)\Delta)$. Współczynnik $\Delta$  może być dowolną dodatnią liczbą, ale jego wybór ma wpływ na czas działania algorytmu. W naszej implementacji to $max(1, floor(2W/m))$, gdzie $W$ to suma wag, a $m$ to liczba krawędzi. Dla $m=0$ przyjmujemy $\Delta=1$. Przed rozpoczęciem właściwego algorytmu dla każdego wierzchołka dzielimy krawędzie na lekkie ($waga <= \Delta$) oraz ciężkie ($waga > \Delta$). Lekkie krawędzie mogą poprawiać odległości
+wewnątrz aktualnego kubełka, natomiast ciężkie na pewno prowadzą
+do późniejszych kubełków od aktualnie przetwarzanego. Pozwala to odroczyć ciężkie relaksacje do zakończenia fazy lekkiej i ograniczyć liczbę operacji. Zaczynamy od jednego kubełka zawierającego wierzchołek $0$ z odległością $0$. Następnie dopóki wszystkie kubełki nie są puste:
+\begin{enumerate}
+    \item Wybieramy najmniejszy niepusty kubełek. 
+    \item Relaksujemy równolegle krawędzie lekkie zapisując ich wynikowe pozycje do bufora
+    \item Jeden wątek przenosi pozycje z buforów do kubełków. Jeśli aktualny kubełek nie jest pusty, to powtarzamy proces relaksacji lekkich krawędzi
+    \item Po zakończeniu fazy lekkiej relaksujemy równolegle krawędzie ciężkie. Korzystamy z tablicy wartości $added$, aby każdy wierzchołek trafił do fazy ciężkiej tylko raz
+    \item Ponownie jeden wątek przenosi wierzchołki z buforów do kubełków
+\end{enumerate}
+Wersja wielowątkowa korzysta z biblioteki OpenMP. Przetwarzanie kubełków odbywa się w bloku \texttt{omp parallel}. Pętla, która przechodzi przez wierzchołki obecnego kubełka, jest podzielona przez \texttt{omp for}. Bufor przy relaksacji jest konieczny, ponieważ operacja \texttt{push\_back} nie jest atomowa. Przy scalaniu buforów korzystamy z \texttt{omp single}. Odległości przechowujemy w wektorze elementów atomowych. Funkcja \texttt{compare\_exchange\_weak} pozwala bezpiecznie zaktualizować odległość, kiedy kilka wątków jednocześnie
+znajduje różne drogi do tego samego wierzchołka. Sekwencyjność pozostaje przy wczytaniu i inicjalizacji danych, budowie grafu, podziale na krawędzie light i heavy oraz wcześniej wspomnianym scalaniu buforów. 
+\section{Pomiar wydajności algorytmu}
+Wydajność była badana zarówno na urządzeniu lokalnym (CPU: Intel Core i7-1260P), jak i na serwerze (CPU: 4 x Xeon Gold 6154). Wyniki prezentują się następująco:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{wyniki2.png}
+    \caption{Mediany czasu działania algorytmów na serwerze i lokalnie,
+    bez operacji wejścia oraz wyjścia. Czasy podano w sekundach. Tabelę przygotowano w programie Excel.}
+    \label{fig:wyniki-serwer}
+\end{figure}
+Rozwiązania zostały przebadane na: 
+\begin{enumerate}
+    \item Trzech grafach Random - losowe grafy na 4 mln wierzchołków i na 16 mln krawędzi. Rozwiązania zostały uruchomione na każdym grafie z tej grupy po trzy razy, po czym obliczono medianę.
+    \item Grafie Path - ścieżka na 10 tys. wierzchołków, zostało wykonanych po 5 pomiarów i wybrano medianę.
+    \item Grafie warstwowym na 2 mln wierzchołków. Wykonano 5 pomiarów i wpisano do tabeli medianę.
+\end{enumerate}
+Analiza uzyskanych danych znajduje się w sekcji Wnioski.
+\section{Kompilacja i uruchomienie}
+Domyślne uruchomienie programu następuje poprzez wywołanie skryptu $run.sh$, który uruchamia $scaling.py$ - program w Pythonie odpowiedzialny za skompilowanie rozwiązań oraz wygenerowanie grafów testowych, na których następnie czasy rozwiązań są porównywane. Oczywiście można też skompilować i przetestować rozwiązania ręcznie komendami: \begin{verbatim}
+g++ src/dijkstraOneThread.cpp -O3 -std=c++17 -o dijkstraOneThread
+g++ src/dijkstraDeltaStepping.cpp -O3 -std=c++17 -fopenmp -o dijkstraDeltaStepping
+\end{verbatim}
+Oba programy przyjmują wejście w postaci kolejnych linii:
+\begin{enumerate}
+    \item liczba zestawów danych $z$
+    \item liczba wierzchołków $n$ i krawędzi $m$
+    \item $m$ linii opisujących krawędzie skierowane w postaci $u$, $v$, $val$.
+\end{enumerate}
+\section{Wnioski}
+Nasza implementacja zrównoleglonego algorytmu Dijkstry przy uruchomieniu na serwerze uzyskała przyspieszenie $3{,}61\times$, $3{,}29\times$, $3{,}31\times$ na grafach losowych oraz $2{,}22\times$ na grafie warstwowym. Przy uruchomieniu lokalnym uzyskano przyspieszenie $1{,}61\times$, $2{,}82\times$, $2{,}84\times$ na grafach losowych
+oraz $2{,}59\times$ na grafie warstwowym. Mnożnik został wybrany jako najbardziej efektywne dobranie liczby wątków przy każdym grafie. Niestety delta-stepping okazuje się nie być efektywny dla ścieżki. Straty wynikikające z wielowątkowości znacznie przewyższają zyski, przez co program dla ścieżki działa wolniej.
+\end{document}
