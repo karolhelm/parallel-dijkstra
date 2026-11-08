@@ -4,6 +4,8 @@
 #include <map>
 #include <atomic>
 #include <omp.h>
+#include <chrono>
+#include <iomanip>
 
 using namespace std;
 
@@ -20,7 +22,7 @@ struct node{
     long long dist;
 };
 
-long long deltaStepping(vector<vector<edge>> &graph, long long delta){
+vector<long long> deltaStepping(vector<vector<edge>> &graph, long long delta){
     int n = graph.size();
     vector<vector<edge>> light(n), heavy(n);
     for(int u = 0; u < n; ++u){
@@ -158,13 +160,18 @@ long long deltaStepping(vector<vector<edge>> &graph, long long delta){
         }
     }
 
-    return distance[n - 1];
+    vector<long long> result(n);
+    for(int v = 0; v < n; ++v){
+        result[v] = distance[v].load();
+    }
+    
+    return result;
 }
-// we want to go from 0 to n - 1 
 
 int main(){
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
+    double benchTime = 0;
 
     int z;
     cin >> z;
@@ -192,14 +199,18 @@ int main(){
         }
 
         long long delta = m > 0 ? max((long long)1, 2*w/m) : 1;
-        long long answer = deltaStepping(graph, delta);
+        auto benchStart = chrono::steady_clock::now();
+        vector<long long> distance = deltaStepping(graph, delta);
+        benchTime += chrono::duration<double>(chrono::steady_clock::now() - benchStart).count();
 
-        if(answer == INF){
-            cout << -1 << "\n";
-        }else{
-            cout << answer << "\n";
+        for(int v = 0; v < n; ++v){
+            if(v > 0) cout << ' ';
+            cout << (distance[v] == INF ? -1 : distance[v]);
         }
+        cout << "\n";
 
         z--;
     }
+
+    cerr << setprecision(12) << "BENCH_SOLVE " << benchTime << "\n";
 }

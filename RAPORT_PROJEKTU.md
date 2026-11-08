@@ -83,6 +83,36 @@ Projekt zrównolegla sam algorytm dla pojedynczego przypadku. Wyniki pokazują p
 
 [1] U. Meyer, P. Sanders, Δ-stepping: a parallelizable shortest path algorithm, Journal of Algorithms 49(1), 114-152, 2003. https://doi.org/10.1016/S0196-6774(03)00076-2
 
-Seria WSL: benchmark/results/20261107-222438. Seria serwerowa: benchmark/results/20261107-222252. Raport wykorzystuje wyłącznie te dwie serie podane przez autora projektu; wcześniejsze pomiary nie zostały domieszane. Zgodność źródeł potwierdzają ich skróty w metadata.json.
+Seria WSL: benchmark/results/20261107-222438. Seria serwerowa: benchmark/results/20261107-222252. Podstawowe porównanie WSL z serwerem wykorzystuje te dwie serie. Dodatkowe pomiary z 8 listopada opisano oddzielnie w uzupełnieniu. Zgodność źródeł potwierdzają ich skróty w metadata.json.
 
 SHA-256 wejścia: `e99dd46edd07898a59bb9da4e4e9378bcbd9d0837e8c77f05136dcf9b3ed7c43`.
+
+## 7. Uzupełnienie - inne typy grafów (8 listopada 2026)
+
+8 listopada 2026 wykonano na tym samym serwerze trzy pełne serie: dwa dodatkowe typy grafów oraz ponowny losowy test kontrolny. Dla każdej konfiguracji: jedna rozgrzewka i pięć pomiarów w przemieszanej kolejności, p = 1, 2, 4, 8, 16. Kod, kompilator, ustawienia OpenMP i przypięcie CPU są zgodne z wcześniejszą serią serwerową. Wszystkie 90 mierzonych wyników przeszło porównanie pełnych tablic odległości z Dijkstrą. Serwer był współdzielony; load 1 min: 299-332.
+
+Losowy: n = 4 000 000, m = 16 000 000, rodzina jak w części podstawowej. Warstwowy: n = 4 000 000, m = 15 624 996, 32 warstwy za źródłem; krawędzie prowadzą wyłącznie do następnej warstwy. Cykl: n = m = 250 000, krawędzie 0 → 1 → ... → n-1 → 0. We wszystkich seriach wagi 1-1000, ziarno 20261107. Cykl jest mniejszym testem struktury grafu; jego czasów bezwzględnych nie porównujemy z czasami grafów czteromilionowych.
+
+Próba cyklu n = 250 000 na WSL została przerwana po przekroczeniu 120 s przez Δ16 w drugim pomiarze. Nie liczono median z niepełnej serii i nie włączono jej do tabeli. Zestawienie poniżej dotyczy wyłącznie kompletnych pomiarów serwera.
+
+Mediany compute [s]. Zysk Δ16 jest liczony względem Dijkstry.
+
+| Graf | Dijkstra | Δ1 | Δ2 | Δ4 | Δ8 | Δ16 | Zysk Δ16 |
+|---|---|---|---|---|---|---|---|
+| Losowy | 4,9409 | 2,3360 | 2,0347 | 1,6333 | 1,4095 | 1,4143 | 3,49× |
+| Warstwowy | 4,3110 | 1,9519 | 1,9513 | 1,6674 | 1,5232 | 1,5654 | 2,75× |
+| Cykl | 0,0032 | 0,9305 | 1,2539 | 1,3676 | 1,8866 | 10,3766 | 0,0003× |
+
+Na cyklu Δ16 jest około 3239× wolniejsze od Dijkstry i 11,2× wolniejsze od Δ1. Front ma szerokość jeden, więc nie ma relaksacji do podziału między wątki. Pozostają koszty barier, atomików i kubełków. Dijkstra ma tu w kolejce najwyżej jeden aktywny wpis.
+
+Na grafie warstwowym Δ16 daje 2,75× względem Dijkstry; w losowym pomiarze kontrolnym jest to 3,49×. Najlepsza mediana delta-stepping przypada odpowiednio na 8 i 8 wątków. Przejście od Δ1 do najlepszej konfiguracji warstwowej daje 1,28×. Szerokie fronty umożliwiają podział pracy, lecz sam rozmiar wejścia nie gwarantuje przyspieszenia. O wyniku współdecydują struktura grafu, liczba faz i synchronizacja. Jedno ziarno na rodzinę nadal nie uzasadnia wniosku o wszystkich grafach danego typu.
+
+Odtworzenie (domyślnie pięć pomiarów i jedna rozgrzewka):
+
+```bash
+python3 benchmark/scaling.py --sizes 4000000
+python3 benchmark/scaling.py --sizes 4000000 --graph layered --layers 32
+python3 benchmark/scaling.py --sizes 250000 --degree 1
+```
+
+Surowe wyniki: benchmark/graph_types.csv. Seria kontrolna: 20261108-server-random-4m; warstwowa: 20261108-server-layered-4m; cykl: 20261108-server-cycle-250k. Metadane są w odpowiadających katalogach benchmark/results/. Pliki wejściowe pozostawiono na serwerze; odtwarzają je podane polecenia. Wartości w tabeli to mediany compute [s]; zysk = mediana Dijkstry / mediana Δ16.
